@@ -15,7 +15,11 @@ type Decoder struct {
 }
 
 func NewDecoder() Decoder {
-	return Decoder{}
+	return Decoder{
+		clusters: newGraph(),
+		mode: SumProduct,
+		noise: 1,
+	}
 }
 
 func (dc Decoder) proirProb(z float64) (float64, float64) {
@@ -27,9 +31,9 @@ func (dc Decoder) proirProb(z float64) (float64, float64) {
 
 func indicatorFactor(chk []int) Factor {
 	scope := []int{}
-	for _, v := range chk {
+	for i, v := range chk {
 		if v == 1 {
-			scope = append(scope, v)
+			scope = append(scope, i)
 		}
 	}
 	fc := NewFactor(scope)
@@ -54,7 +58,6 @@ func (dc Decoder) singletonFactor(idx int, z float64) Factor {
 
 
 func (dc Decoder) Init() error {
-
 	return nil
 }
 
@@ -79,12 +82,113 @@ func (dc Decoder) initAsCliqueTree(chk [][]int) error {
 					goto last
 				}
 			}
-		last:
 		}
+	last:
 	}
+
+	// init vertex
 	for _,v := range indicators {
 		dc.clusters.addVertex(v)
 	}
 
+	// init edges
+	dc.clusters.setEdge(0,1,Factor{})
+	dc.clusters.setEdge(1,0,Factor{})
+	dc.clusters.setEdge(1,2,Factor{})
+	dc.clusters.setEdge(2,1,Factor{})
+
 	return nil
+}
+
+
+// msg from i to j
+func (dc Decoder) msg(i,j int) Factor {
+	fc := dc.clusters.getVertex(i).Factor
+	for nb := dc.clusters.nodes[i].edges; nb != nil; nb = nb.next {
+		if nb.nodeId != j {
+			fc = FactorProduct(fc,*dc.clusters.getEdge(nb.nodeId,i))
+		}
+	}
+
+	rm := scpDiff(dc.clusters.nodes[i].scope,dc.clusters.nodes[j].scope)
+
+	if dc.mode == MaxProduct {
+		fc = fc.maxOut(rm)
+	} else {
+		fc = fc.sumOut(rm)
+	}
+
+	return fc
+}
+
+
+func (dc Decoder) isReady(i,j int) bool {
+
+	for nb := dc.clusters.nodes[i].edges; nb != nil; nb = nb.next {
+		if nb.nodeId != j {
+			edge := dc.clusters.getEdge(nb.nodeId,i)
+			if edge == nil || edge.data == nil {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+
+func (dc Decoder) updateMsgs() {
+	status := make(map[[2]int]bool)
+
+	for computable := true; computable; {
+		computable = false
+		for i,_ := range dc.clusters.nodes {
+			for nb := dc.clusters.nodes[i].edges; nb != nil; nb = nb.next {
+				j := nb.nodeId
+				if dc.isReady(i,j) {
+					if !status[[2]int{i,j}] {
+						computable = true
+						dc.clusters.setEdge(i,j,dc.msg(i,j))
+						status[[2]int{i,j}] = true
+					}
+				}
+			}
+		}
+	}
+}
+
+
+func (dc Decoder) updateBelief() {
+	for i,_ := range dc.clusters.nodes {
+		fc := dc.clusters.getVertex(i).Factor
+		for nb := dc.clusters.nodes[i].edges; nb != nil; nb = nb.next {
+			fc = FactorProduct(*dc.clusters.getEdge(nb.nodeId,i),fc)
+		}
+		dc.clusters.getVertex(i).belief = fc
+	}
+}
+
+func (dc Decoder) Decode() []int {
+	dc.updateMsgs()
+	dc.updateBelief()
+
+	code := make([]int,7)
+	foo := func(i int) Factor {
+		for _,v := range dc.clusters.nodes {
+			for _,vv := range v.scope {
+				if vv == i {
+					return v.sumOut(scpDiff(v.scope,[]int{i}))
+				}
+			}
+		}
+		return Factor{}
+	}
+
+	for i,_ := range code {
+		fc := foo(i)
+		if fc.data[1] > fc.data[0] {
+			code[i] = 1
+		}
+	}
+
+	return code
 }

@@ -65,9 +65,13 @@ func memIndex(s []int) int {
 
 
 func (f Factor) Get(s []int) float64 {
-	if len(s) != len(f.scope) {
+	if f.data == nil {
+		panic("Facotor.data did not init")
+	}
+	if len(s) != len(f.scope)  {
 		panic("Factor.Get scope len dose not match up")
 	}
+
 	return f.data[memIndex(s)]
 }
 
@@ -166,4 +170,59 @@ func NewFactor(order []int) Factor {
 		factor.data[i] = 1
 	}
 	return factor
+}
+
+
+func catScpIdx(aIdx, bIdx, aScp, bScp []int) []int {
+	scp := scpUnion(aScp,bScp)
+	scpIdx := make([]int,len(scp))
+
+	foo := func(xIdx,xScp []int){
+		xAddr := addrBook(scp,xScp)
+		for i,v := range xAddr {
+			scpIdx[v] = xIdx[i]
+		}
+	}
+	foo(aIdx,aScp)
+	foo(bIdx,bScp)
+
+	return scpIdx
+}
+
+
+func (fc Factor) sumOut(rm  []int) Factor {
+	keep := scpDiff(fc.scope,rm)
+	nfc := NewFactor(keep)
+
+	walk(len(keep),func(oidx []int){
+		sum := 0.0
+		var idx []int
+		walk(len(rm),func(iidx []int) {
+			idx = catScpIdx(oidx,iidx,keep,rm)
+			sum += fc.Get(idx)
+		})
+		nfc.Set(oidx,sum)
+	})
+
+	return nfc
+}
+
+
+func (fc Factor) maxOut(rm []int) Factor {
+	keep := scpDiff(fc.scope,rm)
+	nfc := NewFactor(keep)
+
+	walk(len(keep),func(oidx []int){
+		max := 0.0
+		var idx []int
+		walk(len(rm),func(iidx []int) {
+			idx = catScpIdx(oidx,iidx,keep,rm)
+			if max < fc.Get(idx) {
+				max = fc.Get(idx)
+			}
+		})
+		nfc.Set(oidx,max)
+	})
+
+	return nfc
 }

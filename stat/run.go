@@ -31,8 +31,9 @@ func test(mod int, fn string) {
 		output = append(output,float64(errCnt+1)/(7*10))
 	}
 
-	
+
 	f,err := os.Create(fn)
+
 	if err != nil {
 		panic(err)
 	}
@@ -60,13 +61,3 @@ func chkErr(a,b []int) bool {
 	}
 	return false
 }
-
-
-
-
-
-
-
-
-
-

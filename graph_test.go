@@ -18,11 +18,13 @@ func TestGraphOperations(t *testing.T) {
 
 	g.setEdge(0,1, NewFactor([]int{0}))
 	g.setEdge(0,2, NewFactor([]int{0,1}))
+	g.setEdge(0,1, NewFactor([]int{1}))
 
 	g.setVertex(0,fc2)
 	//spew.Dump(g)
 	if g.getVertex(0).scope[0] != 1 ||
-		g.nodes[0].edges.next.nodeId != 2 {
+		g.nodes[0].edges.next.nodeId != 2 ||
+		g.nodes[0].edges.value.scope[0] != 1 {
 		t.Fail()
 	}
 }

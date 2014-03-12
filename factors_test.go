@@ -25,10 +25,24 @@ func TestFactorOperations(t *testing.T) {
 		t.Fail()
 	}
 
+	// chk with len(scope) = 0 (constant)
 	fc3 := NewFactor([]int{})
 	fc4 := FactorProduct(fc0,fc3)
 	if fc4.Get([]int{1,0}) != 2 ||
 		fc4.Get([]int{0,0}) != 1 {
+		t.Fail()
+	}
+}
+
+func TestSumOut (t *testing.T) {
+	fc := NewFactor([]int{1,2})
+	fc.Set([]int{0,0},2)
+	nfc := fc.sumOut([]int{1})
+	if nfc.Get([]int{0}) != 3 || nfc.Get([]int{1}) != 2 {
+		t.Fail()
+	}
+	nfc = fc.maxOut([]int{2})
+	if nfc.Get([]int{0}) != 2 || nfc.Get([]int{1}) != 1 {
 		t.Fail()
 	}
 }
