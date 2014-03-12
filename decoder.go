@@ -39,7 +39,7 @@ func indicatorFactor(chk []int) Factor {
 	fc := NewFactor(scope)
 
 	walk(len(scope), func(idx []int) {
-		sum := 0
+		sum := 1
 		for _, v := range idx {
 			sum += v
 		}
