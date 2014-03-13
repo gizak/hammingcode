@@ -3,43 +3,48 @@ package hammingcode
 import "sort"
 import "github.com/fatih/set"
 
+// Factor represents factor function in MRF. It has two properties: scope and data, scope is an assemble of involving random variables; data is a one-dimensional float64 array storing the value matrix.
 type Factor struct {
 	scope []int
 	data  []float64
 }
 
-func orderScp(sc []int){
+// increasely sort
+func orderScp(sc []int) {
 	sort.IntSlice(sc).Sort()
 }
 
-func scpDiff(a,b []int) []int{
+// a\b
+func scpDiff(a, b []int) []int {
 	sa := setFromIntSlice(a)
 	sb := setFromIntSlice(b)
-	sc := set.Difference(sa,sb)
+	sc := set.Difference(sa, sb)
 	c := set.IntSlice(sc)
 	orderScp(c)
-	return  c
+	return c
 }
 
-func scpUnion(a, b []int) []int{
+// a + b
+func scpUnion(a, b []int) []int {
 	sa := setFromIntSlice(a)
 	sb := setFromIntSlice(b)
-	sc := set.Union(sa,sb)
+	sc := set.Union(sa, sb)
 	c := set.IntSlice(sc)
 	orderScp(c)
-	return  c
+	return c
 }
 
-func scpIntsc(a,b []int) []int{
+// ab
+func scpIntsc(a, b []int) []int {
 	sa := setFromIntSlice(a)
 	sb := setFromIntSlice(b)
-	sc := set.Intersection(sa,sb)
+	sc := set.Intersection(sa, sb)
 	c := set.IntSlice(sc)
 	orderScp(c)
-	return  c
+	return c
 }
 
-
+// Generates a set form given int slice
 func setFromIntSlice(sl []int) *set.SetNonTS {
 	s := set.NewNonTS()
 	for _, v := range sl {
@@ -47,7 +52,6 @@ func setFromIntSlice(sl []int) *set.SetNonTS {
 	}
 	return s
 }
-
 
 // the index on the memeroy. i.e. the index of factor data slice
 func memIndex(s []int) int {
@@ -63,19 +67,21 @@ func memIndex(s []int) int {
 	return idx
 }
 
-
+// Get returns the actual value. e.g.:
+//    value := factor.Get([]int{0,1,0,1})
+//    //value is the value of P when x0=0,x1=1,x2=0,x3=1
 func (f Factor) Get(s []int) float64 {
 	if f.data == nil {
 		panic("Facotor.data did not init")
 	}
-	if len(s) != len(f.scope)  {
+	if len(s) != len(f.scope) {
 		panic("Factor.Get scope len dose not match up")
 	}
 
 	return f.data[memIndex(s)]
 }
 
-
+// Set sets the value of the Factor given a configuration
 func (f Factor) Set(s []int, v float64) {
 	if len(s) != len(f.scope) {
 		panic("Factor.Set scope len dose not match up")
@@ -83,7 +89,6 @@ func (f Factor) Set(s []int, v float64) {
 	idx := memIndex(s)
 	f.data[idx] = v
 }
-
 
 // y = 2**x
 func pow2(x int) int {
@@ -93,7 +98,6 @@ func pow2(x int) int {
 	}
 	return y
 }
-
 
 // generate and iter bin-like code slice invoking fn
 func walk(l int, fn func([]int)) {
@@ -109,7 +113,6 @@ func walk(l int, fn func([]int)) {
 		}
 	}
 }
-
 
 // return the index slice of a's el in the base. i.e. base[rt[i]] = a[i]
 // a is neccessarily a subset of base
@@ -132,14 +135,13 @@ func addrBook(base, a []int) []int {
 	return aIdxAddr
 }
 
-
 // return a*b. merge scopes and multiply values
 func FactorProduct(a, b Factor) Factor {
 	scopec := scpUnion(a.scope, b.scope)
 
 	// address book based on scopec
-	aIdxAddr := addrBook(scopec,a.scope)
-	bIdxAddr := addrBook(scopec,b.scope)
+	aIdxAddr := addrBook(scopec, a.scope)
+	bIdxAddr := addrBook(scopec, b.scope)
 
 	// assign c, new factor
 	c := NewFactor(scopec)
@@ -160,7 +162,6 @@ func FactorProduct(a, b Factor) Factor {
 	return c
 }
 
-
 // return a new factor with all value is 1
 func NewFactor(order []int) Factor {
 	l := len(order)
@@ -172,56 +173,56 @@ func NewFactor(order []int) Factor {
 	return factor
 }
 
-
+// concat a,b given a,b's values and scopes
 func catScpIdx(aIdx, bIdx, aScp, bScp []int) []int {
-	scp := scpUnion(aScp,bScp)
-	scpIdx := make([]int,len(scp))
+	scp := scpUnion(aScp, bScp)
+	scpIdx := make([]int, len(scp))
 
-	foo := func(xIdx,xScp []int){
-		xAddr := addrBook(scp,xScp)
-		for i,v := range xAddr {
+	foo := func(xIdx, xScp []int) {
+		xAddr := addrBook(scp, xScp)
+		for i, v := range xAddr {
 			scpIdx[v] = xIdx[i]
 		}
 	}
-	foo(aIdx,aScp)
-	foo(bIdx,bScp)
+	foo(aIdx, aScp)
+	foo(bIdx, bScp)
 
 	return scpIdx
 }
 
-
-func (fc Factor) sumOut(rm  []int) Factor {
-	keep := scpDiff(fc.scope,rm)
+// sum-product
+func (fc Factor) sumOut(rm []int) Factor {
+	keep := scpDiff(fc.scope, rm)
 	nfc := NewFactor(keep)
 
-	walk(len(keep),func(oidx []int){
+	walk(len(keep), func(oidx []int) {
 		sum := 0.0
 		var idx []int
-		walk(len(rm),func(iidx []int) {
-			idx = catScpIdx(oidx,iidx,keep,rm)
+		walk(len(rm), func(iidx []int) {
+			idx = catScpIdx(oidx, iidx, keep, rm)
 			sum += fc.Get(idx)
 		})
-		nfc.Set(oidx,sum)
+		nfc.Set(oidx, sum)
 	})
 
 	return nfc
 }
 
-
+// max-product
 func (fc Factor) maxOut(rm []int) Factor {
-	keep := scpDiff(fc.scope,rm)
+	keep := scpDiff(fc.scope, rm)
 	nfc := NewFactor(keep)
 
-	walk(len(keep),func(oidx []int){
+	walk(len(keep), func(oidx []int) {
 		max := 0.0
 		var idx []int
-		walk(len(rm),func(iidx []int) {
-			idx = catScpIdx(oidx,iidx,keep,rm)
+		walk(len(rm), func(iidx []int) {
+			idx = catScpIdx(oidx, iidx, keep, rm)
 			if max < fc.Get(idx) {
 				max = fc.Get(idx)
 			}
 		})
-		nfc.Set(oidx,max)
+		nfc.Set(oidx, max)
 	})
 
 	return nfc

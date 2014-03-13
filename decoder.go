@@ -1,15 +1,18 @@
+// Copyleft 2014 winter. All rights you dont need to care about ;)
+// Build for the course ELG5131 Graphical Models, Prof. Yongyi Mao
+
+// Package hammingcode implements hamming (7,4) error control decoding task using graphical model method.
 package hammingcode
 
 import "math"
 import "errors"
 
-//import "fmt"
+const SumProduct = 0        //mode
+const MaxProduct = 1 << 1   //mode
+const CliqueTree = 1 << 2   // arch
+const LoopyCluster = 1 << 3 // arch
 
-const SumProduct = 0
-const MaxProduct = 1 << 1
-const CliqueTree = 1 << 2
-const LoopyCluster = 1 << 3
-
+// Decoder stores all the graph info used to compute.
 type Decoder struct {
 	clusters *graph
 	mode     int
@@ -19,6 +22,7 @@ type Decoder struct {
 	noise    float64
 }
 
+// NewDecoder returns a pointer pointing to Decoder.
 func NewDecoder() *Decoder {
 	return &Decoder{
 		clusters: newGraph(),
@@ -28,6 +32,7 @@ func NewDecoder() *Decoder {
 	}
 }
 
+// Calc P(x|z)
 func (dc Decoder) proirProb(z float64) (float64, float64) {
 	foo := func(x int) float64 {
 		return 1 / (1 + math.Exp((1-2*float64(x))*4*z/math.Pow(dc.noise, 2)))
@@ -35,6 +40,7 @@ func (dc Decoder) proirProb(z float64) (float64, float64) {
 	return foo(0), foo(1)
 }
 
+// Generate the membership function factor e.g. delta(x0 + x2 + x4 + x6).
 func indicatorFactor(chk []int) Factor {
 	scope := []int{}
 	for i, v := range chk {
@@ -55,12 +61,14 @@ func indicatorFactor(chk []int) Factor {
 	return fc
 }
 
+// Generate singletons probability factor. e.g. F1 := P(x1|z1)
 func (dc Decoder) singletonFactor(idx int, z float64) Factor {
 	x0, x1 := dc.proirProb(z)
 	fc := Factor{[]int{idx}, []float64{x0, x1}}
 	return fc
 }
 
+// Init build the model structure, should be invoked after all neccessary vars being set
 func (dc Decoder) Init(chk [][]int) error {
 	switch dc.arch {
 
@@ -73,6 +81,7 @@ func (dc Decoder) Init(chk [][]int) error {
 	return nil
 }
 
+// Init as a clique tree
 func (dc Decoder) initAsCliqueTree(chk [][]int) error {
 	singletons := []Factor{}
 	for i, v := range dc.rcvdCode {
@@ -131,6 +140,7 @@ func (dc Decoder) msg(i, j int) Factor {
 	return fc
 }
 
+// Check whether msg_{i \to j} is ready
 func (dc Decoder) isReady(i, j int) bool {
 
 	for nb := dc.clusters.nodes[i].edges; nb != nil; nb = nb.next {
@@ -144,6 +154,7 @@ func (dc Decoder) isReady(i, j int) bool {
 	return true
 }
 
+// Update all edges msgs iterativly until all msgs are computed
 func (dc Decoder) updateMsgs() {
 	status := make(map[[2]int]bool)
 
@@ -164,6 +175,7 @@ func (dc Decoder) updateMsgs() {
 	}
 }
 
+// Compute every vertex's belief, should be called after updateMsgs
 func (dc Decoder) updateBelief() {
 	for i, _ := range dc.clusters.nodes {
 		fc := dc.clusters.getVertex(i).Factor
@@ -174,6 +186,7 @@ func (dc Decoder) updateBelief() {
 	}
 }
 
+// Decode when using clique tree struct
 func (dc Decoder) decodeAsCliqueTree() []int {
 	dc.updateMsgs()
 	dc.updateBelief()
@@ -221,6 +234,7 @@ MAXP:
 	return code
 }
 
+// Decode decodes the code from a received code. The choice of method depends on the .arch property.
 func (dc Decoder) Decode() []int {
 	switch dc.arch {
 	case CliqueTree:
@@ -230,18 +244,22 @@ func (dc Decoder) Decode() []int {
 	}
 }
 
+// Set received code into Docoder. The code should be []float64 formatted.
 func (dc *Decoder) SetRcvCode(c []float64) {
 	dc.rcvdCode = c
 }
 
+// Set the method used in decoding (i.e. Max-Produt or Sum-Product)
 func (dc *Decoder) SetMode(m int) {
 	dc.mode = m
 }
 
+// Set the Structure used in decoding (i.e. Cycle-free: CliquTree or LoopyCluster)
 func (dc *Decoder) SetArch(a int) {
 	dc.arch = a
 }
 
+// Set the guassian noise's std dev
 func (dc *Decoder) SetNoiseLevel(n float64) {
 	dc.noise = n
 }
